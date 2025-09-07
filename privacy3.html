@@ -1,0 +1,356 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Guardian</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      min-width: 400px;
+    }
+    button {
+      transition: background-color 0.2s;
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 font-sans text-gray-800">
+  <div class="p-4">
+    <!-- Tabs -->
+    <div class="flex justify-around border-b mb-4">
+      <button class="tab-btn px-3 py-2 font-semibold text-blue-600 border-b-2 border-transparent hover:border-blue-600 active" data-tab="popup">Overview</button>
+      <button class="tab-btn px-3 py-2 font-semibold text-gray-600 border-b-2 border-transparent hover:border-blue-600" data-tab="details">Details</button>
+      <button class="tab-btn px-3 py-2 font-semibold text-gray-600 border-b-2 border-transparent hover:border-blue-600" data-tab="settings">Settings</button>
+      <button class="tab-btn px-3 py-2 font-semibold text-gray-600 border-b-2 border-transparent hover:border-blue-600" data-tab="help">Help</button>
+    </div>
+
+    <!-- Popup Section -->
+    <div id="popup" class="tab-content active">
+      <div class="flex items-center mb-4">
+        <img id="favicon" src="default-favicon.png" alt="Favicon" class="w-6 h-6 mr-2">
+        <h1 id="websiteName" class="text-lg font-semibold truncate">Loading...</h1>
+      </div>
+      <div class="text-center mb-4">
+        <div class="text-4xl font-bold text-blue-600" id="privacyScore">0</div>
+        <span class="text-sm text-gray-600">Privacy Score</span>
+      </div>
+      <div class="text-center mb-4">
+        <div class="text-2xl font-semibold" id="trackersBlocked">0</div>
+        <span class="text-sm text-gray-600">Trackers Blocked</span>
+      </div>
+      <div class="mb-4">
+        <h2 class="text-sm font-medium text-gray-700">Data Types Collected</h2>
+        <ul id="dataTypes" class="text-sm text-gray-600">
+          <li>Loading...</li>
+        </ul>
+      </div>
+      <div class="flex justify-between mb-4">
+        <button id="allowSite" class="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600">Allow Site</button>
+        <button id="blockTrackers" class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600">Block Trackers</button>
+      </div>
+    </div>
+
+    <!-- Details Section -->
+    <div id="details" class="tab-content">
+      <h1 class="text-xl font-bold mb-4">Privacy Details</h1>
+      <section class="mb-6">
+        <h2 class="text-lg font-semibold mb-2">Score Breakdown</h2>
+        <div id="scoreBreakdown" class="text-sm text-gray-600">
+          <p>Loading score details...</p>
+        </div>
+      </section>
+      <section class="mb-6">
+        <h2 class="text-lg font-semibold mb-2">Trackers</h2>
+        <ul id="trackersList" class="text-sm text-gray-600">
+          <li>Loading trackers...</li>
+        </ul>
+      </section>
+      <section class="mb-6">
+        <h2 class="text-lg font-semibold mb-2">Cookies</h2>
+        <ul id="cookiesList" class="text-sm text-gray-600">
+          <li>Loading cookies...</li>
+        </ul>
+      </section>
+      <section class="mb-6">
+        <h2 class="text-lg font-semibold mb-2">Network Requests</h2>
+        <div id="networkRequests" class="text-sm text-gray-600">
+          <p>Loading network requests...</p>
+        </div>
+      </section>
+      <section class="mb-6">
+        <h2 class="text-lg font-semibold mb-2">Permission Requests</h2>
+        <ul id="permissionRequests" class="text-sm text-gray-600">
+          <li>Loading permissions...</li>
+        </ul>
+      </section>
+      <section class="mb-6">
+        <h2 class="text-lg font-semibold mb-2">Security Info</h2>
+        <div id="securityInfo" class="text-sm text-gray-600">
+          <p>Loading security details...</p>
+        </div>
+      </section>
+    </div>
+
+    <!-- Settings Section -->
+    <div id="settings" class="tab-content">
+      <h1 class="text-xl font-bold mb-4">Settings</h1>
+      <section class="mb-6">
+        <h2 class="text-lg font-semibold mb-2">Tracker Blocking</h2>
+        <label class="flex items-center">
+          <input type="checkbox" id="autoBlockTrackers" class="mr-2">
+          <span class="text-sm">Enable automatic tracker blocking</span>
+        </label>
+      </section>
+      <section class="mb-6">
+        <h2 class="text-lg font-semibold mb-2">Site Rules</h2>
+        <div class="mb-2">
+          <input id="siteInput" type="text" placeholder="Enter site URL" class="border p-2 w-full rounded">
+        </div>
+        <button id="addWhitelist" class="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 mr-2">Add to Whitelist</button>
+        <button id="addBlacklist" class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600">Add to Blacklist</button>
+        <ul id="siteRules" class="text-sm text-gray-600 mt-2">
+          <li>Loading site rules...</li>
+        </ul>
+      </section>
+      <section class="mb-6">
+        <h2 class="text-lg font-semibold mb-2">Advanced Detection</h2>
+        <label class="flex items-center">
+          <input type="checkbox" id="advancedDetection" class="mr-2">
+          <span class="text-sm">Enable fingerprinting and cookie inspection</span>
+        </label>
+      </section>
+      <section class="mb-6">
+        <h2 class="text-lg font-semibold mb-2">Blocklist Management</h2>
+        <label class="flex items-center mb-2">
+          <input type="checkbox" id="autoUpdateBlocklist" class="mr-2">
+          <span class="text-sm">Auto-update blocklist</span>
+        </label>
+        <button id="importBlocklist" class="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 mr-2">Import Blocklist</button>
+        <button id="exportBlocklist" class="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600">Export Blocklist</button>
+      </section>
+      <section class="mb-6">
+        <h2 class="text-lg font-semibold mb-2">Preferences</h2>
+        <div class="mb-2">
+          <label class="block text-sm mb-1">Theme</label>
+          <select id="theme" class="border p-2 w-full rounded">
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </div>
+        <div class="mb-2">
+          <label class="block text-sm mb-1">Language</label>
+          <select id="language" class="border p-2 w-full rounded">
+            <option value="en">English</option>
+            <option value="es">Spanish</option>
+            <option value="fr">French</option>
+          </select>
+        </div>
+        <label class="flex items-center">
+          <input type="checkbox" id="notifications" class="mr-2">
+          <span class="text-sm">Enable notifications</span>
+        </label>
+      </section>
+    </div>
+
+    <!-- Help Section -->
+    <div id="help" class="tab-content">
+      <h1 class="text-xl font-bold mb-4">Help & About</h1>
+      <section class="mb-6">
+        <h2 class="text-lg font-semibold mb-2">What Privacy Guardian Does</h2>
+        <p class="text-sm text-gray-600">
+          Privacy Guardian is a browser extension that protects your online privacy by detecting and blocking trackers, analyzing cookies, and evaluating website security. It provides a privacy score and detailed insights to help you make informed decisions about your data.
+        </p>
+      </section>
+      <section class="mb-6">
+        <h2 class="text-lg font-semibold mb-2">How the Scoring System Works</h2>
+        <p class="text-sm text-gray-600">
+          The privacy score (0–100) is calculated based on factors like the number of trackers, types of data collected, and security practices. A higher score indicates better privacy practices, while a lower score highlights potential risks.
+        </p>
+      </section>
+      <section class="mb-6">
+        <h2 class="text-lg font-semibold mb-2">FAQ & Troubleshooting</h2>
+        <div class="text-sm text-gray-600">
+          <p><strong>Q: Why is my privacy score low?</strong></p>
+          <p>A: A low score may result from multiple trackers, aggressive data collection, or insecure connections. Check the Details tab for more information.</p>
+          <p><strong>Q: How do I allow a specific site?</strong></p>
+          <p>A: Use the "Allow Site" button in the Overview tab or add the site to the whitelist in Settings.</p>
+          <p><strong>Q: Extension not working?</strong></p>
+          <p>A: Ensure the extension has necessary permissions and try refreshing the page.</p>
+        </div>
+      </section>
+      <section class="mb-6">
+        <h2 class="text-lg font-semibold mb-2">Privacy Policy</h2>
+        <p class="text-sm text-gray-600">
+          Learn more about how we handle your data at our <a href="https://privacy.com/privacy" target="_blank" class="text-blue-500 hover:underline">Privacy Policy</a>.
+        </p>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    // Tab switching
+    document.querySelectorAll('.tab-btn').forEach(button => {
+      button.addEventListener('click', () => {
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('text-blue-600', 'border-blue-600'));
+        const tabId = button.getAttribute('data-tab');
+        document.getElementById(tabId).classList.add('active');
+        button.classList.add('text-blue-600', 'border-blue-600');
+      });
+    });
+
+    // Mock data (replace with actual browser extension API calls)
+    const websiteData = {
+      name: 'privacy.com',
+      favicon: 'https://privacy.com/favicon.ico',
+      privacyScore: 85,
+      trackersBlocked: 3,
+      dataTypes: ['Cookies', 'Fingerprinting', 'Ads'],
+      scoreBreakdown: 'Score based on minimal trackers and secure HTTPS connection.',
+      trackers: [
+        { domain: 'food paradise', purpose: 'Advertising', status: 'Blocked' },
+        { domain: 'meesho', purpose: 'Analytics', status: 'Allowed' }
+      ],
+      cookies: [
+        { name: 'session_id', domain: 'privacy.com', expiry: '1 year' }
+      ],
+      networkRequests: '10 first-party, 5 third-party requests detected.',
+      permissionRequests: ['Location'],
+      securityInfo: 'HTTPS enabled, no mixed content detected.',
+      settings: {
+        autoBlockTrackers: true,
+        siteRules: ['privacy.com (Whitelist)', 'tracker.com (Blacklist)'],
+        advancedDetection: false,
+        autoUpdateBlocklist: true,
+        theme: 'light',
+        language: 'en',
+        notifications: true
+      }
+    };
+
+    // Update UI
+    document.getElementById('websiteName').textContent = websiteData.name;
+    document.getElementById('favicon').src = websiteData.favicon;
+    document.getElementById('privacyScore').textContent = websiteData.privacyScore;
+    document.getElementById('trackersBlocked').textContent = websiteData.trackersBlocked;
+    document.getElementById('dataTypes').innerHTML = websiteData.dataTypes.map(type => `<li>${type}</li>`).join('');
+    document.getElementById('scoreBreakdown').textContent = websiteData.scoreBreakdown;
+    document.getElementById('trackersList').innerHTML = websiteData.trackers.map(t => 
+      `<li>${t.domain} (${t.purpose}): ${t.status}</li>`).join('');
+    document.getElementById('cookiesList').innerHTML = websiteData.cookies.map(c => 
+      `<li>${c.name} (${c.domain}, expires: ${c.expiry})</li>`).join('');
+    document.getElementById('networkRequests').textContent = websiteData.networkRequests;
+    document.getElementById('permissionRequests').innerHTML = websiteData.permissionRequests.map(p => `<li>${p}</li>`).join('');
+    document.getElementById('securityInfo').textContent = websiteData.securityInfo;
+    document.getElementById('autoBlockTrackers').checked = websiteData.settings.autoBlockTrackers;
+    document.getElementById('advancedDetection').checked = websiteData.settings.advancedDetection;
+    document.getElementById('autoUpdateBlocklist').checked = websiteData.settings.autoUpdateBlocklist;
+    document.getElementById('theme').value = websiteData.settings.theme;
+    document.getElementById('language').value = websiteData.settings.language;
+    document.getElementById('notifications').checked = websiteData.settings.notifications;
+    document.getElementById('siteRules').innerHTML = websiteData.settings.siteRules.map(rule => `<li>${rule}</li>`).join('');
+
+    // Event listeners
+    document.getElementById('allowSite').addEventListener('click', () => {
+      chrome.runtime.sendMessage({ action: 'allowSite', url: websiteData.name });
+    });
+
+    document.getElementById('blockTrackers').addEventListener('click', () => {
+      chrome.runtime.sendMessage({ action: 'blockTrackers', url: websiteData.name });
+    });
+
+    document.getElementById('autoBlockTrackers').addEventListener('change', (e) => {
+      chrome.storage.sync.set({ autoBlockTrackers: e.target.checked });
+    });
+
+    document.getElementById('advancedDetection').addEventListener('change', (e) => {
+      chrome.storage.sync.set({ advancedDetection: e.target.checked });
+    });
+
+    document.getElementById('autoUpdateBlocklist').addEventListener('change', (e) => {
+      chrome.storage.sync.set({ autoUpdateBlocklist: e.target.checked });
+    });
+
+    document.getElementById('theme').addEventListener('change', (e) => {
+      chrome.storage.sync.set({ theme: e.target.value });
+      document.body.classList.toggle('dark', e.target.value === 'dark');
+    });
+
+    document.getElementById('language').addEventListener('change', (e) => {
+      chrome.storage.sync.set({ language: e.target.value });
+    });
+
+    document.getElementById('notifications').addEventListener('change', (e) => {
+      chrome.storage.sync.set({ notifications: e.target.checked });
+    });
+
+    document.getElementById('addWhitelist').addEventListener('click', () => {
+      const site = document.getElementById('siteInput').value;
+      if (site) {
+        chrome.runtime.sendMessage({ action: 'addWhitelist', site });
+      }
+    });
+
+    document.getElementById('addBlacklist').addEventListener('click', () => {
+      const site = document.getElementById('siteInput').value;
+      if (site) {
+        chrome.runtime.sendMessage({ action: 'addBlacklist', site });
+      }
+    });
+
+    document.getElementById('importBlocklist').addEventListener('click', () => {
+      chrome.runtime.sendMessage({ action: 'importBlocklist' });
+    });
+
+    document.getElementById('exportBlocklist').addEventListener('click', () => {
+      chrome.runtime.sendMessage({ action: 'exportBlocklist' });
+    });
+  </script>
+</body>
+</html>
